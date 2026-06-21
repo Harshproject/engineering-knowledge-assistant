@@ -1,6 +1,7 @@
 package com.harsh.engineeringknowledgeassistant.service;
 
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
@@ -22,17 +23,27 @@ public class RagService {
     }
 
     public String ask(String question) {
-
+        System.out.println("Question : "+question);
         List<DocumentChunk> chunks =
                 retrievalService.retrieve(
                         question,
                         3
-                );
-
+                );   
+        if(chunks.isEmpty()){
+            return "No relevant documentation found.";
+        }
+        Set<String> sources = chunks.stream()
+            .map(DocumentChunk::source)
+            .collect(Collectors.toSet());
+        
         // prompt build karenge
         String context = chunks.stream()
         .map(DocumentChunk::text)
         .collect(Collectors.joining("\n\n"));
+
+        String sourceString = sources.stream()
+        .map(source -> "• " + source)
+        .collect(Collectors.joining("\n"));
 
         String prompt = """
         You are an engineering knowledge assistant.
@@ -47,10 +58,18 @@ public class RagService {
 
         Question:
         %s
+
+        Sources:
+        %s
+
         """
-        .formatted(context, question);
+        .formatted(context, question, sourceString);
         System.out.print(prompt);
-        return geminiService.askGemini(prompt);
-        // return prompt;
+        // return geminiService.askGemini(prompt);
+        // String answer = geminiService.askGemini(prompt);
+        // // return prompt;
+
+        // return answer + "\n\nSources:\n" + sourceString;
+        return prompt;
     }
 }

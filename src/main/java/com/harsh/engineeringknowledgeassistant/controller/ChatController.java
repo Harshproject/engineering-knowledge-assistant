@@ -5,7 +5,10 @@ import com.harsh.engineeringknowledgeassistant.dto.gemini.Document;
 import com.harsh.engineeringknowledgeassistant.dto.gemini.DocumentChunk;
 import com.harsh.engineeringknowledgeassistant.dto.gemini.EmbeddingRequest;
 import com.harsh.engineeringknowledgeassistant.service.ChunkingService;
+import com.harsh.engineeringknowledgeassistant.service.ConfluenceDocumentSource;
 import com.harsh.engineeringknowledgeassistant.service.DocumentLoaderService;
+import com.harsh.engineeringknowledgeassistant.service.DocumentSource;
+import com.harsh.engineeringknowledgeassistant.service.EmbeddingCacheService;
 import com.harsh.engineeringknowledgeassistant.service.GeminiService;
 import com.harsh.engineeringknowledgeassistant.service.RagService;
 import com.harsh.engineeringknowledgeassistant.service.RetrievalService;
@@ -23,13 +26,19 @@ public class ChatController {
     private final RagService ragService;
     private final DocumentLoaderService documentLoaderService;
     private final ChunkingService chunkingService;
+    private final ConfluenceDocumentSource confluenceDocumentSource;
+    private final List<DocumentSource> sources;
+    private final EmbeddingCacheService cacheService;
 
-    public ChatController(GeminiService geminiService, RetrievalService retrievalService, RagService ragService, DocumentLoaderService documentLoaderService, ChunkingService chunkingService) {
+    public ChatController(GeminiService geminiService, RetrievalService retrievalService, RagService ragService, DocumentLoaderService documentLoaderService, ChunkingService chunkingService, ConfluenceDocumentSource confluenceDocumentSource, List<DocumentSource> sources, EmbeddingCacheService cacheService) {
         this.geminiService = geminiService;
         this.retrievalService=retrievalService;
         this.ragService=ragService;
         this.documentLoaderService=documentLoaderService;
         this.chunkingService=chunkingService;
+        this.confluenceDocumentSource=confluenceDocumentSource;
+        this.sources=sources;
+        this.cacheService=cacheService;
     }
 
     @PostMapping("/ask")
@@ -69,5 +78,34 @@ public class ChatController {
         return chunkingService.chunk(
                 documentLoaderService.loadDocuments()
         );
+    }
+
+    @GetMapping("/documents")
+    public List<Document> confluenceDocs(){
+
+            List<Document> documents =
+                    sources.stream()
+                    .flatMap(
+                            source->
+                                    source.loadDocuments()
+                                            .stream()
+                    )
+                    .toList();
+
+            return documents;
+    }
+
+    @PostMapping("/cache-refresh")
+    public String refreshCache() {
+        try {
+            cacheService.refresh();
+
+            retrievalService.init();
+            return "Cache refreshed";
+        } catch (Exception e) {
+            System.err.println("Error refreshing cache: " + e.getMessage());
+            return "Error refreshing cache";
+        }
+        
     }
 }

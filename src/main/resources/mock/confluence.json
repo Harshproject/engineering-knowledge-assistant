@@ -1,0 +1,16 @@
+{
+  "results": [
+    {
+      "title": "Payment Service",
+      "body": "Processes payments. Exposes POST /payments endpoint. Publishes PaymentCompleted event."
+    },
+    {
+      "title": "Order Service",
+      "body": "Creates customer orders. Calls Payment Service and Inventory Service."
+    },
+    {
+      "title": "Architecture",
+      "body": "Order Service calls Payment Service. Payment Service publishes PaymentCompleted event. Inventory Service consumes PaymentCompleted event."
+    }
+  ]
+}

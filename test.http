@@ -1,10 +1,37 @@
 ### Health
 GET http://localhost:8080/chat/chunks
 
-### Chat
-# POST http://localhost:8080/api/chat
-# Content-Type: application/json
+### Health
+GET http://localhost:8080/chat/documents
 
-# {
-#     "message": "Hello"
-# }
+### Chat
+POST http://localhost:8080/chat/ask
+Content-Type: application/json
+
+{
+  "question": "What is the capital of France?"
+}
+
+### Chat
+POST http://localhost:8080/chat/ragservice
+Content-Type: application/json
+
+{
+  "text": "What is the capital of France?"
+}
+
+### Chat
+POST http://localhost:8080/chat/ragservice
+Content-Type: application/json
+
+{
+  "text": "What endpoint does payment service expose?"
+}
+
+### Chat
+POST http://localhost:8080/chat/ragservice
+Content-Type: application/json
+
+{
+  "text": "what does inventory consumes"
+}

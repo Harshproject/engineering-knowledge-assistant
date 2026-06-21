@@ -21,57 +21,43 @@ import jakarta.annotation.PostConstruct;
 public class RetrievalService {
     
         private final WebClient webClient;
-        private final ObjectMapper objectMapper = new ObjectMapper();
+        private final ObjectMapper objectMapper;
         private final SimilarityService similarityService;
         private final List<DocumentChunk> chunks = new ArrayList<>();
-        private final DocumentLoaderService documentLoaderService;
+        private final EmbeddingCacheService embeddingCacheService;
         private final ChunkingService chunkingService;
+        // private static final double THRESHOLD = 0.75;
+        // private final List<DocumentSource> sources
 
         @Value("${gemini.api.key}")
         private String apiKey;
 
-        // @PostConstruct
-        // public void init() {
-
-        // chunks.add(
-        //         new DocumentChunk(
-        //                 "Payment Service processes transactions",
-        //                 generateEmbedding(
-        //                         "Payment Service processes transactions"
-        //                 ),
-        //                 "something.md"
-        //         )
-        // );
-
-        // chunks.add(
-        //         new DocumentChunk(
-        //                 "User Service manages user accounts",
-        //                 generateEmbedding(
-        //                         "User Service manages user accounts"
-        //                 ),
-        //                 "something.md"
-        //         )
-        // );
-
-        // chunks.add(
-        //         new DocumentChunk(
-        //                 "Inventory Service tracks stock",
-        //                 generateEmbedding(
-        //                         "Inventory Service tracks stock"
-        //                 ),
-        //                 "something.md"
-        //         )
-        // );
-        // }
+        private final List<DocumentSource> sources;
 
         @PostConstruct
         public void init() throws InterruptedException {
 
+        //        List<Document> documents = new ArrayList<>();
+                if(embeddingCacheService.exists()){
+                        chunks.clear();
+                        System.out.println("Loading embeddings from cache");
+                        chunks.addAll(embeddingCacheService.load());
+                        return;
+                }
+
+                System.out.println("Generating embeddings...");
                 List<Document> documents =
-                        documentLoaderService.loadDocuments();
+                sources.stream()
+                .flatMap(
+                        source->
+                                source.loadDocuments()
+                                .stream()
+                )
+                .toList();
 
                 List<DocumentChunk> rawChunks =
                         chunkingService.chunk(documents);
+                
 
                 for(DocumentChunk chunk : rawChunks){
 
@@ -88,14 +74,18 @@ public class RetrievalService {
                                         chunk.source()
                                 )
                         );
+
                 }
+                embeddingCacheService.save(rawChunks);
         }
 
-        public RetrievalService(WebClient.Builder builder, SimilarityService similarityService, DocumentLoaderService documentLoaderService, ChunkingService chunkingService) {
+        public RetrievalService(WebClient.Builder builder, SimilarityService similarityService, ChunkingService chunkingService, ObjectMapper objectMapper, List<DocumentSource> sources, EmbeddingCacheService embeddingCacheService ) {
                 this.webClient = builder.build();
                 this.similarityService=similarityService;
                 this.chunkingService=chunkingService;
-                this.documentLoaderService=documentLoaderService;
+                this.objectMapper=objectMapper;
+                this.sources=sources;
+                this.embeddingCacheService=embeddingCacheService;
         }
 
         public List<Double> generateEmbedding(String text){
@@ -170,13 +160,18 @@ public class RetrievalService {
                         else if(sc1.score()<sc2.score())return 1;
                         return 0;
                 });
+                System.out.println("Question : "+question);
 
-                return scoreChunks
-                .stream()
-                .limit(topK)
-                .map((scoreChunk)->{
-                        return scoreChunk.documentChunk();
-                })
-                .toList();
-        }
+                scoreChunks.forEach(sc->{
+                        System.out.println(sc.score()+" "+sc.documentChunk().source());
+                });
+                List<ScoreChunk> relevant = scoreChunks.stream()
+                        .filter(sc -> sc.score() > 0.7)
+                        .limit(topK)
+                        .toList();
+
+                return relevant.stream()
+                        .map(ScoreChunk::documentChunk)
+                        .toList();
+                }
 }
